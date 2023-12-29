@@ -1,31 +1,44 @@
 #include <iostream>
+#include <stdio.h>
+#pragma warning(disable : 4996) //vyøešit! "fopen" je zastaralý
 
-//glfw
+//glfw opengl
 #define GLFW_INCLUDE_NONE
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 
-//glm
+//glm gpu math
 //#include <glm/glm.hpp>
 #include "glm/gtc/matrix_transform.hpp"
 #include <glm/gtx/transform.hpp>
 #include "glm/ext.hpp"
-//#include <linmath.h>
+
 //dear imgui
 #include "imgui.h"
 #include "backends/imgui_impl_glfw.h"
 #include "backends/imgui_impl_opengl3.h"
-//assimp
+
+//assimp blender import
 #include <assimp/cimport.h>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-//enet
+
+//enet networking
 #include <enet/enet.h>
-//openAL
+
+//openAL audio
 #include <AL/al.h>
+
 //ODE physics
 #include <ode/ode.h>
+
+//Soil image loading
+#include <SOIL2/soil2.h>
+#define FOURCC_DXT1 0x31545844 // Equivalent to "DXT1" in ASCII
+#define FOURCC_DXT3 0x33545844 // Equivalent to "DXT3" in ASCII
+#define FOURCC_DXT5 0x35545844 // Equivalent to "DXT5" in ASCII
+
 //classes
 #include "shaderLoader.h"
 
@@ -33,11 +46,18 @@
 //Do triangle - check!
 //shader reading function - check!
 
+//textures -> texture compression?
+
 //verticles reading function
 //color reading function
 
 //raining cubes
 //noisy raining cubes
+
+
+//function declaration
+GLuint loadImg(const char* imagepath);
+GLuint loadDDS(const char* imagepath);
 
 //tohle tahat ze souboru? pak nahradí assimp
 static const GLfloat g_vertex_buffer_data[] = {
@@ -79,44 +99,45 @@ static const GLfloat g_vertex_buffer_data[] = {
 	1.0f,-1.0f, 1.0f
 };
 
-//tohle asi taky z externího souboru - textury!
-static const GLfloat g_color_buffer_data[] = {
-	0.583f,  0.771f,  0.014f,
-	0.609f,  0.115f,  0.436f,
-	0.327f,  0.483f,  0.844f,
-	0.822f,  0.569f,  0.201f,
-	0.435f,  0.602f,  0.223f,
-	0.310f,  0.747f,  0.185f,
-	0.597f,  0.770f,  0.761f,
-	0.559f,  0.436f,  0.730f,
-	0.359f,  0.583f,  0.152f,
-	0.483f,  0.596f,  0.789f,
-	0.559f,  0.861f,  0.639f,
-	0.195f,  0.548f,  0.859f,
-	0.014f,  0.184f,  0.576f,
-	0.771f,  0.328f,  0.970f,
-	0.406f,  0.615f,  0.116f,
-	0.676f,  0.977f,  0.133f,
-	0.971f,  0.572f,  0.833f,
-	0.140f,  0.616f,  0.489f,
-	0.997f,  0.513f,  0.064f,
-	0.945f,  0.719f,  0.592f,
-	0.543f,  0.021f,  0.978f,
-	0.279f,  0.317f,  0.505f,
-	0.167f,  0.620f,  0.077f,
-	0.347f,  0.857f,  0.137f,
-	0.055f,  0.953f,  0.042f,
-	0.714f,  0.505f,  0.345f,
-	0.783f,  0.290f,  0.734f,
-	0.722f,  0.645f,  0.174f,
-	0.302f,  0.455f,  0.848f,
-	0.225f,  0.587f,  0.040f,
-	0.517f,  0.713f,  0.338f,
-	0.053f,  0.959f,  0.120f,
-	0.393f,  0.621f,  0.362f,
-	0.673f,  0.211f,  0.457f,
-	0.820f,  0.883f,  0.371f,
-	0.982f,  0.099f,  0.879f
+
+//uv map of cube
+static const GLfloat g_uv_buffer_data[] = {
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f,0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
+	0.f, 0.f,
+	0.f,1.0f,
+	1.0f, 1.0f,
 };
 
 //public variables
@@ -184,11 +205,19 @@ int main()
 	// Give our vertices to OpenGL.
 	glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), g_vertex_buffer_data, GL_STATIC_DRAW);
 
-	//ColorBuffer
-	GLuint colorbuffer;
-	glGenBuffers(1, &colorbuffer);
-	glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
+	//UVBuffer
+// This will identify our UV buffer
+	GLuint UVbuffer;
+	// Generate 1 buffer, put the resulting identifier in vertexbuffer
+	glGenBuffers(1, &UVbuffer);
+	// The following commands will talk about our 'vertexbuffer' buffer
+	glBindBuffer(GL_ARRAY_BUFFER, UVbuffer);
+	// Give our vertices to OpenGL.
+	glBufferData(GL_ARRAY_BUFFER, sizeof(g_uv_buffer_data), g_uv_buffer_data, GL_STATIC_DRAW);
+
+
+
+	GLuint textureID = loadImg("Assets/textures/Uncompressed/diagTex.tga");
 
 	//shaders
 	shaderLoader sL;
@@ -241,9 +270,9 @@ int main()
 			(void*)0            // array buffer offset
 		);
 
-		// 2nd attribute buffer : colors
+		// 2nd attribute buffer : UV
 		glEnableVertexAttribArray(1);
-		glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
+		glBindBuffer(GL_ARRAY_BUFFER, UVbuffer);
 		glVertexAttribPointer(
 			1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
 			3,                                // size
@@ -252,6 +281,8 @@ int main()
 			0,                                // stride
 			(void*)0                          // array buffer offset
 		);
+
+
 		//use shader
 		glUseProgram(programID);
 
@@ -269,4 +300,126 @@ int main()
 
 
 	return 0;
+}
+
+//Uncompressed textures
+GLuint loadImg(const char* imagepath) {
+
+	// Create one OpenGL texture
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+
+	// "Bind" the newly created texture : all future texture functions will modify this texture
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	// Read the file, call glTexImage2D with the right parameters
+	//glfwLoadTexture2D(imagepath, 0);
+	
+	/* load an image file directly as a new OpenGL texture */
+	GLuint tex_2d = SOIL_load_OGL_texture
+	(
+		imagepath,
+		SOIL_LOAD_AUTO,
+		SOIL_CREATE_NEW_ID,
+		SOIL_FLAG_MIPMAPS | SOIL_FLAG_INVERT_Y | SOIL_FLAG_NTSC_SAFE_RGB | SOIL_FLAG_COMPRESS_TO_DXT
+	);
+
+	/* check for an error during the load process */
+	if (0 == tex_2d)
+	{
+		printf("SOIL loading error: '%s'\n", SOIL_last_result());
+	}
+	
+	// Nice trilinear filtering.
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	// Return the ID of the texture we just created
+	return textureID;
+}
+//
+GLuint loadDDS(const char* imagepath) {
+
+	unsigned char header[124];
+
+	FILE* fp;
+
+	/* try to open the file */
+	fp = fopen(imagepath, "rb");
+	if (fp == NULL)
+		return 0;
+
+	/* verify the type of file */
+	char filecode[4];
+	fread(filecode, 1, 4, fp);
+	if (strncmp(filecode, "DDS ", 4) != 0) {
+		fclose(fp);
+		return 0;
+	}
+
+	/* get the surface desc */
+	fread(&header, 124, 1, fp);
+
+	unsigned int height = *(unsigned int*)&(header[8]);
+	unsigned int width = *(unsigned int*)&(header[12]);
+	unsigned int linearSize = *(unsigned int*)&(header[16]);
+	unsigned int mipMapCount = *(unsigned int*)&(header[24]);
+	unsigned int fourCC = *(unsigned int*)&(header[80]);
+
+	unsigned char* buffer;
+	unsigned int bufsize;
+	/* how big is it going to be including all mipmaps? */
+	bufsize = mipMapCount > 1 ? linearSize * 2 : linearSize;
+	buffer = (unsigned char*)malloc(bufsize * sizeof(unsigned char));
+	fread(buffer, 1, bufsize, fp);
+	/* close the file pointer */
+	fclose(fp);
+
+	unsigned int components = (fourCC == FOURCC_DXT1) ? 3 : 4;
+	unsigned int format;
+	switch (fourCC)
+	{
+	case FOURCC_DXT1:
+		format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
+		break;
+	case FOURCC_DXT3:
+		format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
+		break;
+	case FOURCC_DXT5:
+		format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+		break;
+	default:
+		free(buffer);
+		return 0;
+	}
+
+	// Create one OpenGL texture
+	GLuint textureID;
+	glGenTextures(1, &textureID);
+
+	// "Bind" the newly created texture : all future texture functions will modify this texture
+	glBindTexture(GL_TEXTURE_2D, textureID);
+
+	unsigned int blockSize = (format == GL_COMPRESSED_RGBA_S3TC_DXT1_EXT) ? 8 : 16;
+	unsigned int offset = 0;
+
+	/* load the mipmaps */
+	for (unsigned int level = 0; level < mipMapCount && (width || height); ++level)
+	{
+		unsigned int size = ((width + 3) / 4) * ((height + 3) / 4) * blockSize;
+		glCompressedTexImage2D(GL_TEXTURE_2D, level, format, width, height,
+			0, size, buffer + offset);
+
+		offset += size;
+		width /= 2;
+		height /= 2;
+	}
+	free(buffer);
+
+	return textureID;
+
+	
 }
