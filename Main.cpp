@@ -145,6 +145,25 @@ static const GLfloat g_uv_buffer_data[] = {
 float height = 720.0;
 float width = 1280.0;
 
+	// horizontal angle : toward -Z
+float horizontalAngle = 3.14f;
+// vertical angle : 0, look at the horizon
+float verticalAngle = 0.0f;  //= 0.0f;
+
+glm::vec3 position = glm::vec3(0, 0, 5);
+glm::vec3 direction = glm::vec3(0, 0, 0);
+
+glm::vec3 right = glm::vec3(0,0,0);
+glm::vec3 up = glm::vec3(0, 0, 0);
+
+float speed = 5.0f; // 3 units / second
+float mouseSpeed = 0.1f;
+
+glm::mat4 ProjectionMatrix = glm::mat4(0.0f);
+glm::mat4 ViewMatrix = glm::mat4(0.0f);
+glm::mat4 ModelMatrix = glm::mat4(0.0f);
+glm::mat4 MVP = glm::mat4(0.0f);
+
 int main()
 {
 
@@ -233,12 +252,18 @@ int main()
 	// Accept fragment if it closer to the camera than the former one
 	glDepthFunc(GL_LESS);
 
-	//if game not paused ->     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 	// pøedìlat! esc bude do pause menu! -> game loop;
 	double currentTime = glfwGetTime();
 	double lastTime;
 	float deltaTime;
+
+	//if game not paused
+	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+	// Cull triangles which normal is not towards the camera
+	glEnable(GL_CULL_FACE);
+
+	controls ctrl;
 
 	do {
 	
@@ -248,20 +273,26 @@ int main()
 		deltaTime = float(currentTime - lastTime);
 
 			// ...
-		controls ctrl;
+
 			// Compute the MVP matrix from keyboard and mouse input
-			ctrl.computeMatricesFromInputs(window, deltaTime);
-			glm::mat4 ProjectionMatrix = ctrl.getProjectionMatrix();
-			glm::mat4 ViewMatrix = ctrl.getViewMatrix();
-			glm::mat4 ModelMatrix = glm::mat4(1.0);
-			glm::mat4 mvp = ProjectionMatrix * ViewMatrix * ModelMatrix;
+		horizontalAngle = ctrl.calcHorizontalAngle(window, width, horizontalAngle, deltaTime, mouseSpeed);
+		verticalAngle = ctrl.calcVerticalAngle(window, height, verticalAngle, deltaTime, mouseSpeed);
+		glfwSetCursorPos(window, width / 2, height / 2);
+		direction = ctrl.calcDirection(horizontalAngle, verticalAngle);
+		right = ctrl.calcRight(horizontalAngle);
+		up = ctrl.calcUp(direction, right);
+		position = ctrl.calcPosition(window, position, direction, right, up,deltaTime, speed);
+		ProjectionMatrix = ctrl.calcProjectionMatrix();
+		ViewMatrix = ctrl.calcViewMatrix(position, direction, up);
+		ModelMatrix = glm::mat4(1.0);
+		MVP = ProjectionMatrix * ViewMatrix * ModelMatrix;
 
 			// ...
 		
 
 		// Send our transformation to the currently bound shader, in the "MVP" uniform
 		// This is done in the main loop since each model will have a different MVP matrix (At least for the M part)
-		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &mvp[0][0]);
+		glUniformMatrix4fv(MatrixID, 1, GL_FALSE, &MVP[0][0]);
 
 		// Clear the screen. It's not mentioned before Tutorial 02, but it can cause flickering, so it's there nonetheless.
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
