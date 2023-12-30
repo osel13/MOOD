@@ -30,8 +30,10 @@
 //openAL audio
 #include <AL/al.h>
 
-//ODE physics
-#include <ode/ode.h>
+
+//bullet physics
+#include "btBulletDynamicsCommon.h"
+
 
 //Soil image loading
 #include <SOIL2/soil2.h>
