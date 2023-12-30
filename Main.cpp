@@ -41,6 +41,7 @@
 
 //classes
 #include "shaderLoader.h"
+#include "controls.h"
 
 //Do window - check!
 //Do triangle - check!
@@ -102,8 +103,8 @@ static const GLfloat g_vertex_buffer_data[] = {
 
 //uv map of cube
 static const GLfloat g_uv_buffer_data[] = {
-	0.f,0.f,
-	0.f,1.0f,
+	0.0f,0.0f,
+	0.0f,1.0f,
 	1.0f, 1.0f,
 	0.f, 0.f,
 	0.f,1.0f,
@@ -232,23 +233,31 @@ int main()
 	// Accept fragment if it closer to the camera than the former one
 	glDepthFunc(GL_LESS);
 
+	//if game not paused ->     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
 	// pøedìlat! esc bude do pause menu! -> game loop;
+	double currentTime = glfwGetTime();
+	double lastTime;
+	float deltaTime;
+
 	do {
-		//Going 3D baby
-		// Projection matrix : 45° Field of View, 4:3 ratio, display range : 0.1 unit <-> 100 units
-		glm::mat4 Projection = glm::perspective(glm::radians(45.0f), (float)width / (float)height, 0.1f, 100.0f);
+	
 
-		// Camera matrix
-		glm::mat4 View = glm::lookAt(
-			glm::vec3(4, 3, -3), // Camera is at (4,3,3), in World Space
-			glm::vec3(0, 0, 0), // and looks at the origin
-			glm::vec3(0, 1, 0)  // Head is up (set to 0,-1,0 to look upside-down)
-		);
+		lastTime = currentTime;
+		currentTime = glfwGetTime();
+		deltaTime = float(currentTime - lastTime);
 
-		// Model matrix : an identity matrix (model will be at the origin)
-		glm::mat4 Model = glm::mat4(1.0f);
-		// Our ModelViewProjection : multiplication of our 3 matrices
-		glm::mat4 mvp = Projection * View * Model; // Remember, matrix multiplication is the other way around
+			// ...
+		controls ctrl;
+			// Compute the MVP matrix from keyboard and mouse input
+			ctrl.computeMatricesFromInputs(window, deltaTime);
+			glm::mat4 ProjectionMatrix = ctrl.getProjectionMatrix();
+			glm::mat4 ViewMatrix = ctrl.getViewMatrix();
+			glm::mat4 ModelMatrix = glm::mat4(1.0);
+			glm::mat4 mvp = ProjectionMatrix * ViewMatrix * ModelMatrix;
+
+			// ...
+		
 
 		// Send our transformation to the currently bound shader, in the "MVP" uniform
 		// This is done in the main loop since each model will have a different MVP matrix (At least for the M part)
@@ -275,7 +284,7 @@ int main()
 		glBindBuffer(GL_ARRAY_BUFFER, UVbuffer);
 		glVertexAttribPointer(
 			1,                                // attribute. No particular reason for 1, but must match the layout in the shader.
-			3,                                // size
+			2,                                // size
 			GL_FLOAT,                         // type
 			GL_FALSE,                         // normalized?
 			0,                                // stride
